@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Expenses{% endblock %}
+{% block content %}
+<section class="add-form">
+    <h2>Add Expense</h2>
+    <form method="POST" action="/add">
+        <div class="form-row">
+            <input type="number" name="amount" step="0.01" min="0.01" placeholder="Amount" required>
+            <input type="text" name="description" placeholder="Description">
+            <select name="category_id">
+                <option value="">-- Category --</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="date" name="date" value="{{ now }}">
+            <button type="submit">Add</button>
+        </div>
+    </form>
+</section>
+
+<section class="expense-list">
+    <h2>Recent Expenses</h2>
+    {% if expenses %}
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for exp in expenses %}
+            <tr>
+                <td>{{ exp.date }}</td>
+                <td class="amount">${{ "%.2f"|format(exp.amount) }}</td>
+                <td>{{ exp.description or "—" }}</td>
+                <td>
+                    {% if exp.category_name %}
+                    <span class="badge" style="background:{{ exp.category_color }}">{{ exp.category_name }}</span>
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="/delete/{{ exp.id }}" style="display:inline">
+                        <button type="submit" class="btn-delete" title="Delete">✕</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No expenses yet. Add one above.</p>
+    {% endif %}
+</section>
+{% endblock %}

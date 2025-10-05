@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 from datetime import datetime
 import sqlite3
 import os
@@ -10,7 +10,7 @@ DB_PATH = os.environ.get("SPENDWISE_DB", "spendwise.db")
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")  # enforce FK
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -59,28 +59,29 @@ def index():
         ORDER BY e.date DESC, e.created_at DESC
         LIMIT 50
     """).fetchall()
+    categories = conn.execute("SELECT * FROM categories ORDER BY name").fetchall()
     conn.close()
-    return jsonify([dict(row) for row in expenses])
+    return render_template("index.html", expenses=expenses, categories=categories)
 
 
 @app.route("/add", methods=["POST"])
 def add_expense():
-    data = request.get_json()
-    if not data or "amount" not in data:
-        return jsonify({"error": "amount required"}), 400
+    amount = request.form.get("amount", type=float)
+    description = request.form.get("description", "").strip()
+    category_id = request.form.get("category_id", type=int)
+    date = request.form.get("date", datetime.now().strftime("%Y-%m-%d"))
 
-    amount = data["amount"]
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        return jsonify({"error": "amount must be positive"}), 400
+    if not amount or amount <= 0:
+        return redirect(url_for("index"))
 
     conn = get_db()
     conn.execute(
         "INSERT INTO expenses (amount, description, category_id, date) VALUES (?, ?, ?, ?)",
-        (amount, data.get("description", ""), data.get("category_id"), data.get("date", datetime.now().strftime("%Y-%m-%d"))),
+        (amount, description, category_id, date),
     )
     conn.commit()
     conn.close()
-    return jsonify({"status": "created"}), 201
+    return redirect(url_for("index"))
 
 
 @app.route("/delete/<int:expense_id>", methods=["POST"])
@@ -89,7 +90,56 @@ def delete_expense(expense_id):
     conn.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
     conn.commit()
     conn.close()
-    return jsonify({"status": "deleted"})
+    return redirect(url_for("index"))
+
+
+@app.route("/api/expenses", methods=["GET"])
+def api_list_expenses():
+    conn = get_db()
+    month = request.args.get("month")
+    if month:
+        expenses = conn.execute("""
+            SELECT e.*, c.name as category_name
+            FROM expenses e
+            LEFT JOIN categories c ON e.category_id = c.id
+            WHERE strftime('%%Y-%%m', e.date) = ?
+            ORDER BY e.date DESC
+        """, (month,)).fetchall()
+    else:
+        expenses = conn.execute("""
+            SELECT e.*, c.name as category_name
+            FROM expenses e
+            LEFT JOIN categories c ON e.category_id = c.id
+            ORDER BY e.date DESC
+            LIMIT 100
+        """).fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in expenses])
+
+
+@app.route("/api/expenses", methods=["POST"])
+def api_add_expense():
+    data = request.get_json()
+    if not data or "amount" not in data:
+        return jsonify({"error": "amount is required"}), 400
+
+    amount = data["amount"]
+    if not isinstance(amount, (int, float)) or amount <= 0:
+        return jsonify({"error": "amount must be positive"}), 400
+
+    description = data.get("description", "")
+    category_id = data.get("category_id")
+    date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
+
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO expenses (amount, description, category_id, date) VALUES (?, ?, ?, ?)",
+        (amount, description, category_id, date),
+    )
+    expense_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return jsonify({"id": expense_id, "status": "created"}), 201
 
 
 if __name__ == "__main__":
