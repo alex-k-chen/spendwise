@@ -19,32 +19,72 @@ def client():
     os.unlink(db_path)
 
 
-def test_index(client):
+def test_index_empty(client):
     rv = client.get("/")
     assert rv.status_code == 200
+    assert b"spendwise" in rv.data
 
 
 def test_add_expense(client):
-    rv = client.post("/add", json={
-        "amount": 10.0,
-        "description": "Lunch",
-        "category_id": 1,
+    rv = client.post("/add", data={
+        "amount": "12.50",
+        "description": "Coffee",
+        "category_id": "1",
         "date": "2025-01-15",
-    })
-    assert rv.status_code == 201
+    }, follow_redirects=True)
+    assert rv.status_code == 200
+    assert b"Coffee" in rv.data
 
 
-def test_add_expense_missing_amount(client):
-    rv = client.post("/add", json={"description": "no amount"})
-    assert rv.status_code == 400
-
-
-def test_add_expense_negative(client):
-    rv = client.post("/add", json={"amount": -5})
-    assert rv.status_code == 400
+def test_add_expense_invalid(client):
+    rv = client.post("/add", data={
+        "amount": "",
+        "description": "Bad",
+    }, follow_redirects=True)
+    assert rv.status_code == 200
 
 
 def test_delete_expense(client):
-    client.post("/add", json={"amount": 5.0, "date": "2025-01-15"})
-    rv = client.post("/delete/1")
+    client.post("/add", data={
+        "amount": "5.00",
+        "description": "Snack",
+        "category_id": "1",
+        "date": "2025-01-15",
+    })
+    rv = client.post("/delete/1", follow_redirects=True)
     assert rv.status_code == 200
+
+
+def test_api_add_expense(client):
+    rv = client.post("/api/expenses", json={
+        "amount": 42.0,
+        "description": "Test API",
+        "category_id": 1,
+        "date": "2025-02-01",
+    })
+    assert rv.status_code == 201
+    data = json.loads(rv.data)
+    assert data["status"] == "created"
+
+
+def test_api_add_expense_missing_amount(client):
+    rv = client.post("/api/expenses", json={"description": "no amount"})
+    assert rv.status_code == 400
+
+
+def test_api_add_expense_negative(client):
+    rv = client.post("/api/expenses", json={"amount": -5})
+    assert rv.status_code == 400
+
+
+def test_api_list_expenses(client):
+    client.post("/api/expenses", json={
+        "amount": 10.0,
+        "description": "Lunch",
+        "date": "2025-03-10",
+    })
+    rv = client.get("/api/expenses?month=2025-03")
+    assert rv.status_code == 200
+    data = json.loads(rv.data)
+    assert len(data) == 1
+    assert data[0]["description"] == "Lunch"
