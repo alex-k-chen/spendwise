@@ -93,6 +93,24 @@ def delete_expense(expense_id):
     return redirect(url_for("index"))
 
 
+@app.route("/summary")
+def summary():
+    month = request.args.get("month", datetime.now().strftime("%Y-%m"))
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT c.name, c.color, COALESCE(SUM(e.amount), 0) as total
+        FROM categories c
+        LEFT JOIN expenses e ON e.category_id = c.id
+            AND strftime('%%Y-%%m', e.date) = ?
+        GROUP BY c.id
+        HAVING total > 0
+        ORDER BY total DESC
+    """, (month,)).fetchall()
+    grand_total = sum(r["total"] for r in rows)
+    conn.close()
+    return render_template("summary.html", rows=rows, month=month, grand_total=grand_total)
+
+
 @app.route("/api/expenses", methods=["GET"])
 def api_list_expenses():
     conn = get_db()
@@ -140,6 +158,22 @@ def api_add_expense():
     conn.commit()
     conn.close()
     return jsonify({"id": expense_id, "status": "created"}), 201
+
+
+@app.route("/api/summary/<month>")
+def api_summary(month):
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT c.name as category, COALESCE(SUM(e.amount), 0) as total
+        FROM categories c
+        LEFT JOIN expenses e ON e.category_id = c.id
+            AND strftime('%%Y-%%m', e.date) = ?
+        GROUP BY c.id
+        HAVING total > 0
+        ORDER BY total DESC
+    """, (month,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
 
 
 if __name__ == "__main__":
