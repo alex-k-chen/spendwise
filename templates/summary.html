@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Monthly Summary{% endblock %}
+{% block content %}
+<section class="summary">
+    <h2>Monthly Summary</h2>
+    <form method="GET" action="/summary" class="month-picker">
+        <input type="month" name="month" value="{{ month }}">
+        <button type="submit">Go</button>
+    </form>
+
+    {% if rows %}
+    <div class="summary-grid">
+        {% for row in rows %}
+        <div class="summary-card">
+            <div class="cat-color" style="background:{{ row.color }}"></div>
+            <div class="cat-info">
+                <span class="cat-name">{{ row.name }}</span>
+                <span class="cat-total">${{ "%.2f"|format(row.total) }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="grand-total">
+        Total: <strong>${{ "%.2f"|format(grand_total) }}</strong>
+    </div>
+    {% else %}
+    <p class="empty">No expenses for {{ month }}.</p>
+    {% endif %}
+</section>
+{% endblock %}
