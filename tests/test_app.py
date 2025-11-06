@@ -88,3 +88,27 @@ def test_api_list_expenses(client):
     data = json.loads(rv.data)
     assert len(data) == 1
     assert data[0]["description"] == "Lunch"
+
+
+def test_summary_page(client):
+    client.post("/add", data={
+        "amount": "20.00",
+        "description": "Groceries",
+        "category_id": "1",
+        "date": "2025-01-15",
+    })
+    rv = client.get("/summary?month=2025-01")
+    assert rv.status_code == 200
+    assert b"20.00" in rv.data
+
+
+def test_api_summary(client):
+    client.post("/api/expenses", json={
+        "amount": 30.0,
+        "category_id": 1,
+        "date": "2025-04-01",
+    })
+    rv = client.get("/api/summary/2025-04")
+    assert rv.status_code == 200
+    data = json.loads(rv.data)
+    assert len(data) >= 1
