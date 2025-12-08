@@ -1,7 +1,9 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for, Response
 from datetime import datetime
 import sqlite3
 import os
+import csv
+import io
 
 app = Flask(__name__)
 DB_PATH = os.environ.get("SPENDWISE_DB", "spendwise.db")
@@ -29,6 +31,12 @@ def init_db():
             category_id INTEGER,
             date TEXT NOT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (category_id) REFERENCES categories(id)
+        );
+        CREATE TABLE IF NOT EXISTS budgets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL,
+            monthly_limit REAL NOT NULL,
             FOREIGN KEY (category_id) REFERENCES categories(id)
         );
     """)
@@ -174,6 +182,30 @@ def api_summary(month):
     """, (month,)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
+
+
+@app.route("/export")
+def export_csv():
+    conn = get_db()
+    expenses = conn.execute("""
+        SELECT e.date, e.amount, e.description, c.name as category
+        FROM expenses e
+        LEFT JOIN categories c ON e.category_id = c.id
+        ORDER BY e.date DESC
+    """).fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Amount", "Description", "Category"])
+    for exp in expenses:
+        writer.writerow([exp["date"], exp["amount"], exp["description"], exp["category"]])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=expenses.csv"},
+    )
 
 
 if __name__ == "__main__":
