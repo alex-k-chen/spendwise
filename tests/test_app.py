@@ -112,3 +112,16 @@ def test_api_summary(client):
     assert rv.status_code == 200
     data = json.loads(rv.data)
     assert len(data) >= 1
+
+
+def test_export_csv(client):
+    client.post("/add", data={
+        "amount": "15.00",
+        "description": "Export test",
+        "category_id": "2",
+        "date": "2025-05-01",
+    })
+    rv = client.get("/export")
+    assert rv.status_code == 200
+    assert rv.content_type == "text/csv; charset=utf-8"
+    assert b"Export test" in rv.data
