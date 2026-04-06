@@ -109,7 +109,7 @@ def summary():
         SELECT c.name, c.color, COALESCE(SUM(e.amount), 0) as total
         FROM categories c
         LEFT JOIN expenses e ON e.category_id = c.id
-            AND strftime('%%Y-%%m', e.date) = ?
+            AND strftime('%Y-%m', e.date) = ?
         GROUP BY c.id
         HAVING total > 0
         ORDER BY total DESC
@@ -128,7 +128,7 @@ def api_list_expenses():
             SELECT e.*, c.name as category_name
             FROM expenses e
             LEFT JOIN categories c ON e.category_id = c.id
-            WHERE strftime('%%Y-%%m', e.date) = ?
+            WHERE strftime('%Y-%m', e.date) = ?
             ORDER BY e.date DESC
         """, (month,)).fetchall()
     else:
@@ -175,7 +175,7 @@ def api_summary(month):
         SELECT c.name as category, COALESCE(SUM(e.amount), 0) as total
         FROM categories c
         LEFT JOIN expenses e ON e.category_id = c.id
-            AND strftime('%%Y-%%m', e.date) = ?
+            AND strftime('%Y-%m', e.date) = ?
         GROUP BY c.id
         HAVING total > 0
         ORDER BY total DESC
